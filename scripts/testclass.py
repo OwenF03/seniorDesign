@@ -11,7 +11,7 @@ class Test:
     NUMSENSORS = 4
     m_conn = serial.Serial() 
     m_voltage = np.zeros((NUMSENSORS, 0))
-    def __init__(self, port, baud = 115200, NUMSENSORS = 4):
+    def __init__(self, port, baud = 921600, NUMSENSORS = 4):
         self.NUMSENSORS = NUMSENSORS
         self.m_conn.port = port
         self.m_conn.baudrate = baud 

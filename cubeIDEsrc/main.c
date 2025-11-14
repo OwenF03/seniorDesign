@@ -37,7 +37,7 @@
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 #define NUMSENSORS 4
-#define NUMSAMPLES 128
+#define NUMSAMPLES 512
 #define DATALEN NUMSENSORS * NUMSAMPLES
 #define ADC_VOLT 0.000805860805861f
 
@@ -76,26 +76,7 @@ static void MX_TIM9_Init(void);
 
 volatile uint16_t adcData[DATALEN]; //Store raw adc values
 volatile float voltage[DATALEN]; //store converted values
-volatile uint8_t dummy[DATALEN * 4];
-
-void debugDummy(){
-	dummy[0] = 'X';
-	for(int i = 1; i < DATALEN * 4 - 1; i++){
-		if(i%4 == 0){
-			dummy[i] = ('\n');
-		}
-		else if (i %3 == 0){
-			dummy[i] = ('\r');
-		}
-		else{
-			dummy[i] = ('A');
-
-		}
-	}
-	dummy[DATALEN * 4 - 1] = 'Z';
-}
-//volatile float voltage[];
-
+volatile float tx_buffer[DATALEN]; // Store data to be transmitted over UART
 
 //Convert adc reading into voltage (stored into res array of floats)
 void adc_voltage(float * res, uint16_t * data, size_t len);
@@ -104,28 +85,35 @@ volatile int timeout = 0;
 volatile int cmdTimeout = 0;
 volatile uint8_t startTrans = 0;
 volatile uint8_t uartComplete = 1;
+volatile uint8_t d_rdy = 0;
+volatile uint8_t rx_cmd = 0;
 volatile int transmit = 0;
+
 // Callback runs when adcData is full
 // Converts into voltage
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc){
-	adc_voltage(voltage, adcData, DATALEN);
+	if(startTrans && !d_rdy){
+		startTrans = 0;
+		adc_voltage(voltage, adcData, DATALEN);
+		memcpy((void *) tx_buffer, (void *) voltage, DATALEN * sizeof(float));
+		d_rdy = 1;
+
+	}
+
 }
+
 
 //Called when a byte is recieved
 // Because PySerial doesn't work as it should (imo)
 // This sets a flag that is handled in the main while loop to delay transmission
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
-	if(uartComplete){
-		uartComplete = 0;
-		transmit = 0;
-	}
-
+		startTrans = 1;
+		HAL_UART_Receive_IT(&huart2, &rx_cmd, 1); // Listen again
 }
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart){
-	uartComplete = 1;
-	//HAL_UART_Transmit_IT(&huart2, "Done\rn", 4);
-	HAL_UART_Receive_IT(&huart2, &startTrans, 1);
+	transmit = 0;
+	d_rdy = 0;
 
 }
 /* USER CODE END 0 */
@@ -167,18 +155,17 @@ int main(void)
   MX_TIM9_Init();
   /* USER CODE BEGIN 2 */
   HAL_ADC_Start_DMA(&hadc1, (uint32_t * ) adcData, DATALEN);
-  HAL_TIM_Base_Start(&htim8); //Timer running at 200 KHz, should trigger a DMA sample every 200 KSPS
-  HAL_UART_Receive_IT(&huart2, &startTrans, 1); //Check for command to start transmion
-debugDummy();
+  HAL_TIM_Base_Start(&htim8); //Timer running at 400 KHz, should trigger a DMA sample every 400 KSPS
+  HAL_UART_Receive_IT(&huart2, &rx_cmd, 1); //Check for command to start transmion
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if(!uartComplete & !transmit){
+	  if(d_rdy & !transmit){
 		  HAL_Delay(100); //Delay
-		  if(HAL_UART_Transmit_DMA(&huart2, (uint8_t *) voltage, DATALEN * sizeof(float)) != HAL_OK){
+		  if(HAL_UART_Transmit_DMA(&huart2, (uint8_t *) tx_buffer, DATALEN * sizeof(float)) != HAL_OK){
 		  	  int z = 0; // Placeholder
 		  }
 		  transmit = 1;
@@ -310,7 +297,6 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_8;
   sConfig.Rank = 4;
-  sConfig.SamplingTime = ADC_SAMPLETIME_15CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -385,9 +371,9 @@ static void MX_TIM8_Init(void)
 
   /* USER CODE END TIM8_Init 1 */
   htim8.Instance = TIM8;
-  htim8.Init.Prescaler = 100 -1 ;
+  htim8.Init.Prescaler = 0;
   htim8.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim8.Init.Period = 5 - 1;
+  htim8.Init.Period = 250 - 1;
   htim8.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim8.Init.RepetitionCounter = 0;
   htim8.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -466,7 +452,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 921600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;

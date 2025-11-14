@@ -13,7 +13,7 @@ else: #default
     port = '/dev/ttyACM0'
 
 dut = Test(port) 
-num = 128
+num = 512
     
 dut.recieve_data(num)
 dut.plotAllSensors()
