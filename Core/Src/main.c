@@ -49,6 +49,7 @@
 #define ADC_VOLT 0.000805860805861f
 
 int state = -1;
+int transmitLength = 0;
 
 #define CALIB "cal"
 #define START "sta"
@@ -63,6 +64,8 @@ int state = -1;
 #define st_DT 3
 #define st_INVALID 4
 #define st_IDLE 7
+#define st_DT_ready 8
+#define st_DT_transmitting 9
 
 /* USER CODE END PM */
 
@@ -108,12 +111,9 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc){
 	if(state == st_CALIB){
 		state = st_CALIB_gathered;
 	}
-	else if(startTrans && !d_rdy){
-		startTrans = 0;
-		memcpy((void *) tx_buffer, (void *) voltage, DATALEN * sizeof(float));
-		adc_voltage(voltage, tx_buffer, DATALEN);
-		d_rdy = 1;
-
+	else if(state == st_DT){
+		adc_voltage(voltage, adcData, DATALEN);
+		state = st_DT_ready;
 	}
 
 }
@@ -209,6 +209,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 		}else if (!strcmp(cmd, STOP)){
 			state = st_STOP;
 		}else if (!strcmp(cmd, DATA_TRANSFER)){
+			transmitLength = rx_cmd[3] << 24 | rx_cmd[4] << 16 | rx_cmd[5] << 8 | rx_cmd[6]; //Get number of samples to send
+			if(transmitLength > NUMSAMPLES) transmitLength = NUMSAMPLES;
 			state = st_DT;
 		}else{
 			state = st_INVALID;
@@ -218,9 +220,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 
 //
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart){
-	transmit = 0;
-	d_rdy = 0;
-
+	state = st_IDLE;
 }
 /* USER CODE END 0 */
 
@@ -284,16 +284,23 @@ int main(void)
 		  calibrate();
 	  }
 	  else if(state == st_IDLE){
-		  HAL_UART_Receive_IT(&huart2, &rx_cmd, CMD_LEN); // Listen again
+		  HAL_UART_Receive_IT(&huart2, &rx_cmd, CMD_LEN); // Listen for next command
 	  }
+	  else if(state == st_DT_ready){
+		  memcpy(tx_buffer, voltage, transmitLength * NUMSENSORS * sizeof(float));
+		  HAL_Delay(100); //Delay for PySerial to work
+		  if(HAL_UART_Transmit_DMA(&huart2, (uint8_t *) tx_buffer, transmitLength * NUMSENSORS * sizeof(float)) != HAL_OK){
+			  return -1; //Error occurred, return from main
+		  }
+		  state = st_DT_transmitting; //Indicate that transmission has started
+	  }
+	  else if (state == st_INVALID){
+		  state = st_IDLE; //Likely sending a response is not necesary
+	  }
+
+
 	  /*
 	  if(d_rdy & !transmit){
-		  HAL_Delay(100); //Delay for PySerial to work
-		  if(HAL_UART_Transmit_DMA(&huart2, (uint8_t *) tx_buffer, DATALEN * sizeof(float)) != HAL_OK){
-		  	  return -1; //Error occurred, return from main
-		  }
-		  transmit = 1; //Indicate that transmission has started
-	  }
 
 	  HAL_Delay(100);
 	  */
