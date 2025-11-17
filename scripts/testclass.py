@@ -16,7 +16,7 @@ class Test:
         self.m_conn.port = port
         self.m_conn.baudrate = baud 
         self.m_conn.open()
-        self.m_conn.timeout = 1
+        self.m_conn.timeout = 10
 
     #Send a start command (binary 1, tbd if final value) 
     def start_transfer(self):
@@ -32,9 +32,16 @@ class Test:
         readSize = (num * self.NUMSENSORS * self.SIZEFLOAT) 
         #Each sensor reading is four floats (4 sensors, 4 bytes per float)
         readVals = []
-        self.start_transfer(); 
+        #self.start_transfer(); 
         with self.m_conn as sh:
+            sh.reset_input_buffer()
             readVals = sh.read(readSize)  
+        print(len(readVals))
+        if(len(readVals) % 4 != 0):
+            print(readVals)
+            num = (len(readVals) // 4) - 1
+            print(len(readVals))
+
         #iterate through byte array by four 
         for i in range(0, num * self.NUMSENSORS * self.SIZEFLOAT, 4):
             ret[i // 4] = struct.unpack('f', readVals[i : i + 4])[0] #Construct float from read values (bytearray)
@@ -75,6 +82,15 @@ class Test:
         ax = self.m_plotSingleSensor(sensorNum, numSamples)
         fig = ax.figure
         fig.show()
+
+    #Send string as UART
+    def send_msg(self, msg):
+        transmit = bytearray() 
+        for i in msg:
+            transmit.append(int(i)) 
+        with self.m_conn as sh:
+            sh.write(transmit)
+
 
     #Plot all sensors as a grid, return figure
     def plotAllSensors(self, numSamples = None):
