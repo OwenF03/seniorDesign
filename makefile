@@ -1,0 +1,59 @@
+CXX=g++
+#flags for importing matlab values
+MATFLAGS= -I${MATLAB_ROOT}/extern/include -L${MATLAB_ROOT}/bin/glnxa64 -Wl,-rpath,${MATLAB_ROOT}/bin/glnxa64 -lmat -lmx -leng
+LDFLAGS=
+BASE_CFLAGS= -g -Wall -Wextra
+
+BUILD ?= release
+
+ifeq ($(BUILD),debug)
+	MUSIC_SRC = MUSIC_debug.cpp
+	CFLAGS = $(BASE_CFLAGS) -O0 -DDEBUG
+	OUTPUT = music_debug.out
+else ifeq ($(BUILD), debugS)
+	MUSIC_SRC = music_single_debug.cpp
+	CFLAGS = $(BASE_CFLAGS)  -O0 -DDEBUG
+	OUTPUT = music_single_debug.out
+else ifeq ($(BUILD), releaseS)
+	MUSIC_SRC = music_single.cpp
+	CFLAGS = $(BASE_CFLAGS) -O2 -DNDEBUG
+	OUTPUT = music_single.out
+else
+	MUSIC_SRC = MUSIC.cpp
+	CFLAGS = $(BASE_CFLAGS) -O2 -DNDEBUG
+	OUTPUT = music.out
+
+endif
+
+SRCS= musTest.cpp readMatFile.cpp $(MUSIC_SRC)
+OBJS = $(SRCS:.cpp=.o)
+
+all: $(OUTPUT)
+
+debugSingle: 
+	$(MAKE) BUILD=debugS
+
+single: 
+	$(MAKE) BUILD=releaseS
+
+music: 
+	$(MAKE) BUILD=music
+
+debug:
+	$(MAKE) BUILD=debug
+
+$(OUTPUT): $(OBJS)
+	$(CXX) $(OBJS) -o $(OUTPUT) $(MATFLAGS) $(LDFLAGS)
+
+%.o: %.cpp
+	$(CXX) $(CFLAGS) -c $< -o $@ $(MATFLAGS)
+
+clean:
+	rm -f $(OUTPUT) $(OBJS) *.d
+	-rm music.out
+	-rm music_single.out
+	-rm music_single_debug.out
+	-rm music_debug.out
+
+
+
