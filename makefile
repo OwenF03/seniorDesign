@@ -7,15 +7,15 @@ BASE_CFLAGS= -g -Wall -Wextra
 BUILD ?= release
 
 ifeq ($(BUILD),debug)
-	MUSIC_SRC = MUSIC_debug.cpp
+	MUSIC_SRC = MUSIC.cpp
 	CFLAGS = $(BASE_CFLAGS) -O0 -DDEBUG
 	OUTPUT = music_debug.out
 else ifeq ($(BUILD), debugS)
-	MUSIC_SRC = music_single_debug.cpp
+	MUSIC_SRC = MUSIC_single.cpp
 	CFLAGS = $(BASE_CFLAGS)  -O0 -DDEBUG
 	OUTPUT = music_single_debug.out
 else ifeq ($(BUILD), releaseS)
-	MUSIC_SRC = music_single.cpp
+	MUSIC_SRC = MUSIC_single.cpp
 	CFLAGS = $(BASE_CFLAGS) -O2 -DNDEBUG
 	OUTPUT = music_single.out
 else

@@ -36,7 +36,7 @@ class DOA{
         Eigen::VectorXcf realToAnalytic(const Eigen::VectorXf& real_signal);  
         //Estimate DOA for incoming siganls 
         // input data is a real valued signal
-        std::vector<double> estimateDOA(std::array<float, M * numSnapshots> & inputData);
+        std::vector<Peak> estimateDOA(float inputData[]);
 
         //Estimate DOA for incoming siganls 
         // input is the covariance matrix of the adc data

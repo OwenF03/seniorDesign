@@ -18,5 +18,7 @@ void readHeaders(MATFile * f, std::unordered_map<std::string, mxArray *> &vars);
 Eigen::MatrixXcf mxArrayToEigenMatrixcf(const mxArray* pa);
 //Extract variableName stored in file fn into a complex valued eigen matrix
 Eigen::MatrixXcf extractVarToEigen(const char * fn, const std::string & variableName);
+//Extract variableName stored in file fn into a vector of floats
+std::vector<float> extractVarToVec(const char * fn, const std::string & variableName); 
 
 #endif
