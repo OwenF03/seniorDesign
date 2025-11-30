@@ -1,4 +1,4 @@
-#include "music_single.h"
+#include "MUSIC_single.h"
 #include <cstdlib>
 #include "readMatFile.h"
 #include <string>

@@ -5,7 +5,7 @@ MATFile * openMatFile(const char *f){
     
     MATFile * file = matOpen(f, "r"); 
     if(file == NULL){
-        printf("Error opening .mat file : %s", file); 
+        printf("Error opening .mat file : %s", f); 
         exit(1); 
     }
 
@@ -16,7 +16,7 @@ void readHeaders(MATFile * f, std::unordered_map<std::string, mxArray *> &vars){
     const char * name;  
     mxArray * dat; 
     //Read variables from file
-    while(dat = matGetNextVariableInfo(f, &name)){
+    while((dat = matGetNextVariableInfo(f, &name))){
         vars.emplace(std::pair<std::string, mxArray*>(std::string(name), dat)); //Add element to map
     }   
 }

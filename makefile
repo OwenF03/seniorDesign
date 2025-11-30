@@ -16,11 +16,11 @@ else ifeq ($(BUILD), debugS)
 	OUTPUT = music_single_debug.out
 else ifeq ($(BUILD), releaseS)
 	MUSIC_SRC = MUSIC_single.cpp
-	CFLAGS = $(BASE_CFLAGS) -O2 -DNDEBUG
+	CFLAGS = $(BASE_CFLAGS) -O2 
 	OUTPUT = music_single.out
 else
 	MUSIC_SRC = MUSIC.cpp
-	CFLAGS = $(BASE_CFLAGS) -O2 -DNDEBUG
+	CFLAGS = $(BASE_CFLAGS) -O2
 	OUTPUT = music.out
 
 endif
@@ -50,10 +50,11 @@ $(OUTPUT): $(OBJS)
 
 clean:
 	rm -f $(OUTPUT) $(OBJS) *.d
-	-rm music.out
-	-rm music_single.out
-	-rm music_single_debug.out
-	-rm music_debug.out
+	-rm music.o
+	-rm MUSIC_single.o
+	-rm music_single.o
+	-rm music_single_debug.o
+	-rm music_debug.o
 
 
 
