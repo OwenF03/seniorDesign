@@ -1,3 +1,6 @@
 ADC_nucleo2.ioc
 cubeIDEsrc/
 scripts/
+*.out
+*.o
+src/test

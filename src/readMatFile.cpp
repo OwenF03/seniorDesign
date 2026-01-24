@@ -1,3 +1,4 @@
+// Generative AI used for parts of these functions 
 #include "readMatFile.h"
 
 //Function to open .mat file

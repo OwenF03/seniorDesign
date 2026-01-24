@@ -1,5 +1,5 @@
-#ifndef MUSIC_SINGLE_H
-#define MUSIC_SINGLE_H
+#ifndef MUSIC_H
+#define MUSIC_H
 
 #include <Eigen/Dense> 
 #include <unsupported/Eigen/FFT>
@@ -13,8 +13,8 @@
 
 //For sorting results 
 struct Peak{
-    float val; 
-    int idx; 
+    float val; //  Value being sorted
+    int idx;   // Index in spectrum list (DOA)
 }; 
 
 //Class designed to implement the MUSIC direction finding algorithm
@@ -22,8 +22,8 @@ class DOA{
     private: 
         int fs; // Sampling frequency
         std::array<double, M> positions; // Transducer positions in meters
-        Eigen::MatrixXcf sv; 
-        Eigen::VectorXd scanAngles;
+        Eigen::MatrixXcf sv; // Steering vector 
+        Eigen::VectorXd scanAngles; //Array containing scan angles (in increments of 1)
         
     public: 
 
@@ -34,6 +34,7 @@ class DOA{
 
         // Make real valued signal analytical so it will work with MUSIC algo
         Eigen::VectorXcf realToAnalytic(const Eigen::VectorXf& real_signal);  
+
         //Estimate DOA for incoming siganls 
         // input data is a real valued signal
         std::vector<Peak> estimateDOA(float inputData[]);

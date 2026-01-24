@@ -2,7 +2,7 @@
 c = 1500;               % Speed of sound in water (m/s)
 fc = 30e3;              % Center frequency for processing (30 kHz)
 lambda = c/fc;          % Wavelength for array geometry
-fs = 400e3;             % Sampling frequency (200 kHz)
+fs = 400e3;             % Sampling frequency (400 kHz)
 Ts = 1/fs;
 N_samples = 128;
 SNR_dB = 10;
@@ -13,12 +13,12 @@ d = lambda/2;
 array_pos = (0:N_elements-1)*d;
 
 %% Acoustic Sources - Define as OFFSETS from center frequency
-source_doas = [30, -15, 60];
+source_doas = [80, -40];
 N_sources = length(source_doas);
-source_powers = [1, 0.3, 0.7];
+source_powers = [1, 1];
 
 % Define frequency OFFSETS from center frequency (not absolute frequencies)
-f_offset = [-8e3, -2e3, 5e3];  % This gives: 22kHz, 28kHz, 35kHz
+f_offset = [-500, 500, 0];  % This gives: 22kHz, 28kHz, 35kHz
 
 %% Generate PROPER Analytic Signals First
 fprintf('Generating proper analytic signals...\n');
@@ -27,14 +27,24 @@ X_analytic = zeros(N_samples, N_elements);
 
 for src_idx = 1:N_sources
     % Generate analytic (complex) signal at the correct frequency
-    actual_freq = fc + f_offset(src_idx);
+    % If f_offset is [0,0,0], all sources are at carrier (30kHz)
     
-    % Complex baseband signal (analytic)
+    % Add a random starting phase to the carrier
+    % This ensures the carrier waves are not perfectly in sync
+    random_carrier_phase = 2*pi*rand; 
+    
     baseband_signal = sqrt(source_powers(src_idx)) * ...
-                     exp(1j*2*pi*f_offset(src_idx)*t + 1j*pi/6*randn);
+                     exp(1j*2*pi*f_offset(src_idx)*t + 1j*random_carrier_phase);
     
-    % Add amplitude modulation to make it more realistic
-    am_modulation = 1 + 0.1*sin(2*pi*50*t);
+    % Decorrelate the Amplitude Modulation (AM)
+    % By giving each source a random phase for its envelope, they become
+    % statistically independent signals.
+    random_am_phase = 2*pi*rand;
+    % Much faster decorrelating modulation
+    am_freq = 10e3 + 5e3*rand;  % Random 10-15 kHz modulation
+    am_modulation = 1 + 0.3*sin(2*pi*am_freq*t + random_am_phase);
+    %am_modulation = 1 + 0.1*sin(2*pi*50*t + random_am_phase);
+    
     baseband_signal = baseband_signal .* am_modulation;
     
     % Steering vector (using center frequency for array geometry)
@@ -242,3 +252,6 @@ title('Reconstruction Error');
 grid on;
 
 fprintf('\nSimulation complete! Real-to-analytic conversion implemented.\n');
+
+
+% Save variables 

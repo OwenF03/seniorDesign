@@ -1,5 +1,5 @@
 // Code is based on Matlab musicdoa.m, steeringvec.m
-#include "MUSIC_single.h"
+#include "MUSIC.h"
 
 //Default constructor
 DOA::DOA(){
@@ -99,7 +99,7 @@ std::vector<struct Peak> DOA::estimateDOA_cov(Eigen::Matrix4cf cov){
 #ifdef DEBUG
     std::cout << "Eigen Vectors Pre Sort\n"; 
     std::cout << eigenvectors<< "\n"; 
-    std::cout << "Eigen Values Pre\n"; 
+    std::cout << "Eigen Values Pre Sort \n"; 
     std::cout << eigenvalues << "\n"; 
 #endif
     // Sort eigenvalues in DESCENDING order (like MATLAB)
@@ -332,7 +332,7 @@ Eigen::MatrixXcf DOA::steeringVector(const Eigen::MatrixXd& pos,
 // elementSpacing: element spacing in wavelengths (typically 0.5)
 // N_elements: number of array elements
 // scanAngles: 1xM vector of broadside angles (in degrees)
-// Generated with calude
+// Generated with claude
 Eigen::MatrixXcf DOA::steeringVectorULA(double elementSpacing,
                                     int N_elements,
                                     const Eigen::VectorXd& scanAngles) {
@@ -358,11 +358,22 @@ Eigen::MatrixXcf DOA::steeringVectorULA(double elementSpacing,
         }
     }
     
+    //Store steering vector into a file for verification purposes 
+#ifdef DEBUG
+
+    file * f = fopen("./cvars/steeringvec.dat");
+    for(int m = 0; m < M; m++){
+        for(int n = 0; n < N_elements; n++){
+
+
+        }
+    }
+#endif
     return sv;
 }
 
 // For use with actual physical parameters 
-// generated with Calude
+// generated with Claude
 Eigen::MatrixXcf DOA::steeringVectorPhysical(int N_elements,
                                         double freq,
                                         double c,

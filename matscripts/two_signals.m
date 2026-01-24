@@ -1,4 +1,9 @@
 %% Corrected Simulation
+%% primarily AI generated (Claude)
+%% This works, however is beyond the scope of this project at the moment,
+%% the Robosub competition sequences the pingers so that the frequencies are 
+%% never mixed (making a dual pass of the MUSIC algorithm with the filtering 
+%% un-necesary)
 clear; close all; clc;
 
 c = 1500;

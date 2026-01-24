@@ -1,4 +1,4 @@
-#include "MUSIC_single.h"
+#include "MUSIC.h"
 #include <cstdlib>
 #include "readMatFile.h"
 #include <string>
@@ -21,13 +21,14 @@ void testEstimateDOA();
 
 int main(){
     testEstimateDOA_cov();
+    std::cout << "\n"; 
     testEstimateDOA();
     return 0; 
 }
 
 void testEstimateDOA_cov(){
     std::cout << "*** Testing estimateDOA_cov() ***\n";
-    std::cout << "Expected DOAs are [30, 60, and -15] (3 sources at )\n";
+    std::cout << "Expected DOAs are [30, 60, and -15]\n";
 
     DOA estimator = DOA(400000); 
     const char * testFile = std::getenv("MUSIC_SINGLE_COV_FILE");
@@ -54,7 +55,7 @@ void testEstimateDOA_cov(){
 }
 void testEstimateDOA(){
     std::cout << "*** Testing estimateDOA ***\n";
-    std::cout << "Expected DOAs are [30, 60, and -15] (3 sources at )\n";
+    std::cout << "Expected DOAs are [30, 60, and -15]\n";
     DOA estimator = DOA(400000); 
 
     //std::vector<float> samples = extractVarToVec("Single_Real.mat", std::string("X_real"));

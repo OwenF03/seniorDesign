@@ -3,6 +3,7 @@ CXX=g++
 MATFLAGS= -I${MATLAB_ROOT}/extern/include -L${MATLAB_ROOT}/bin/glnxa64 -Wl,-rpath,${MATLAB_ROOT}/bin/glnxa64 -lmat -lmx -leng
 LDFLAGS=
 BASE_CFLAGS= -g -Wall -Wextra
+SRC = src
 
 BUILD ?= release
 
@@ -10,14 +11,6 @@ ifeq ($(BUILD),debug)
 	MUSIC_SRC = MUSIC.cpp
 	CFLAGS = $(BASE_CFLAGS) -O0 -DDEBUG
 	OUTPUT = music_debug.out
-else ifeq ($(BUILD), debugS)
-	MUSIC_SRC = MUSIC_single.cpp
-	CFLAGS = $(BASE_CFLAGS)  -O0 -DDEBUG
-	OUTPUT = music_single_debug.out
-else ifeq ($(BUILD), releaseS)
-	MUSIC_SRC = MUSIC_single.cpp
-	CFLAGS = $(BASE_CFLAGS) -O2 
-	OUTPUT = music_single.out
 else
 	MUSIC_SRC = MUSIC.cpp
 	CFLAGS = $(BASE_CFLAGS) -O2
@@ -25,7 +18,7 @@ else
 
 endif
 
-SRCS= musTest.cpp readMatFile.cpp $(MUSIC_SRC)
+SRCS= $(SRC)/test.cpp $(SRC)/readMatFile.cpp $(SRC)/$(MUSIC_SRC)
 OBJS = $(SRCS:.cpp=.o)
 
 all: $(OUTPUT)
@@ -49,12 +42,10 @@ $(OUTPUT): $(OBJS)
 	$(CXX) $(CFLAGS) -c $< -o $@ $(MATFLAGS)
 
 clean:
-	rm -f $(OUTPUT) $(OBJS) *.d
-	-rm music.o
-	-rm MUSIC_single.o
-	-rm music_single.o
-	-rm music_single_debug.o
-	-rm music_debug.o
+	rm -f $(SRC)/*.d
+	rm -f *.out
+	rm -f $(SRC)/*.o
+	
 
 
 
