@@ -89,7 +89,8 @@ std::vector<struct Peak> DOA::estimateDOA_cov(Eigen::Matrix4cf cov){
     Eigen::SelfAdjointEigenSolver<Eigen::Matrix4cf> eig(cov); 
 
     if(eig.info() != Eigen::Success){
-        throw std::runtime_error("Eigen Value Decomposition Failed"); 
+        //throw std::runtime_error("Eigen Value Decomposition Failed"); 
+        return {}; 
     }
     
 
@@ -361,7 +362,7 @@ Eigen::MatrixXcf DOA::steeringVectorULA(double elementSpacing,
     //Store steering vector into a file for verification purposes 
 #ifdef DEBUG
 
-    file * f = fopen("./cvars/steeringvec.dat");
+    FILE * f = fopen("./cvars/steeringvec.dat", "w");
     for(int m = 0; m < M; m++){
         for(int n = 0; n < N_elements; n++){
 
