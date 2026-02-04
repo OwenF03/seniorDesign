@@ -2,7 +2,7 @@
 #define PARAMS_H
 
 constexpr int M = 4; // Number of array elements (transducers). This is fixed
-constexpr int N_signals = 3; // Number of sources 
+constexpr int N_signals = 2; // Number of sources 
 constexpr int numSnapshots = 128; // Number of measurments from each transducer
 constexpr int distance = 1; //Distance in meters 
 constexpr float fc[N_signals] = {30000.0, 30000.0}; 

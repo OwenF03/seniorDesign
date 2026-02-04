@@ -11,11 +11,12 @@
 #include <float.h>
 #include "params.h"
 
+
 //For sorting results 
 struct Peak{
-    float val; //  Value being sorted
     int idx;   // Index in spectrum list (DOA)
-}; 
+    float val; //  Value being sorted
+};
 
 //Class designed to implement the MUSIC direction finding algorithm
 class DOA{
@@ -80,5 +81,23 @@ class DOA{
         Eigen::MatrixXcf steeringVectorPhysical(int N_elements, double freq,double c,const std::vector<double>& doa_degrees);
 
 };
+
+
+//Debug functions
+//Write contents of matrix v into file var_name, located in ./vars/
+// Size information is not stored because it is a known quantity and 
+// can be obtained from the matlab variables
+bool d_write_cf(Eigen::MatrixXcf v, std::string var_name);
+
+//Write contents of vector v into file var_name, located in ./vars/
+// Size information is not stored because it is a known quantity and 
+// can be obtained from the matlab variables
+bool d_write_vf(Eigen::VectorXf v, std::string var_name);
+
+//Function to log results from DOA calculation
+// Stores DOAs (ints) first, and then the values associated with them 
+// Allows file to be read by creating two one dimensional vectors, starting 
+// at an offset in the file 
+bool d_write_res(std::vector<struct Peak> &v, std::string var_name);
 
 #endif

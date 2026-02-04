@@ -28,7 +28,7 @@ int main(){
 
 void testEstimateDOA_cov(){
     std::cout << "*** Testing estimateDOA_cov() ***\n";
-    std::cout << "Expected DOAs are [30, 60, and -15]\n";
+    std::cout << "Expected DOAs are [80, -40]\n";
 
     DOA estimator = DOA(400000); 
     const char * testFile = std::getenv("MUSIC_SINGLE_COV_FILE");
@@ -55,7 +55,7 @@ void testEstimateDOA_cov(){
 }
 void testEstimateDOA(){
     std::cout << "*** Testing estimateDOA ***\n";
-    std::cout << "Expected DOAs are [30, 60, and -15]\n";
+    std::cout << "Expected DOAs are [80, -40]\n";
     DOA estimator = DOA(400000); 
 
     //std::vector<float> samples = extractVarToVec("Single_Real.mat", std::string("X_real"));
@@ -73,14 +73,28 @@ void testEstimateDOA(){
     std::cout << "\n"; 
 #endif
     auto res = estimator.estimateDOA(samples.data());
-
+    
+    std::vector<struct Peak> top_results = std::vector<struct Peak>();
     //Search for peaks 
     // Print top N peaks
     std::cout << "\n=== TOP " << N_signals << " PEAKS ===\n";
     for (int i = 0; i < std::min(N_signals, (int)res.size()); i++) {
         std::cout << "Peak " << i+1 << ": Angle = " << (res[i].idx - 90) 
                   << " degrees, Value = " << res[i].val << "\n";
+        top_results.emplace_back(Peak{res[i].idx - 90, res[i].val});
     }
+
+    std::cout << "Followup \n"; 
+    for (int i = 0; i < std::min(5, (int)res.size()); i++) {
+        std::cout << "Peak " << i+1 << ": Angle = " << (res[i].idx - 90) 
+                  << " degrees, Value = " << res[i].val << "\n";
+    }
+    
+
+#ifdef TEST
+    std::cout << top_results.size() << "\n";
+    d_write_res(top_results, "estimated_doas_music"); 
+#endif
 }
 
 

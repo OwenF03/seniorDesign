@@ -1,6 +1,95 @@
 // Code is based on Matlab musicdoa.m, steeringvec.m
 #include "MUSIC.h"
 
+//Write contents of matrix v into file var_name, located in ./vars/
+// Size information is not stored because it is a known quantity and 
+// can be obtained from the matlab variables
+bool d_write_cf(Eigen::MatrixXcf v, std::string var_name){
+    auto path = std::string("./src/vars/") + var_name; 
+    
+    FILE * f = fopen(path.c_str(), "wb"); 
+    if(!f){
+        return false;
+    }
+
+    //Iterate and write array (after being reshaped to 1D row major)
+
+    for(std::complex<float> i : v.reshaped<Eigen::RowMajor>().transpose()){
+        typedef struct im{float r; float im;}data; 
+        data num = {i.real(), i.imag()};
+        int nb = fwrite( &num, 4, 2, f); 
+        if(nb != 2){
+            return false;
+        }
+    }
+
+    return true;
+}
+
+//Write contents of vector v into file var_name, located in ./vars/
+// Size information is not stored because it is a known quantity and 
+// can be obtained from the matlab variables
+bool d_write_vf(Eigen::VectorXf v, std::string var_name){
+    auto path = std::string("./src/vars/") + var_name; 
+    
+    FILE * f = fopen(path.c_str(), "wb"); 
+    if(!f){
+        return false;
+    }
+
+    //Iterate and write array (after being reshaped to 1D row major)
+    for(float i : v){
+        int nb = fwrite( &i, 4, 1, f); 
+        if(nb != 1){
+            fclose(f);
+            return false;
+        }
+    }
+    fclose(f); 
+    return true;
+
+}
+
+//Function to log results from DOA calculation
+// Stores DOAs (ints) first, and then the values associated with them 
+// Allows file to be read by creating two one dimensional vectors, starting 
+// at an offset in the file 
+bool d_write_res(std::vector<struct Peak> &v, std::string var_name){
+    auto path = std::string("./src/vars/") + var_name; 
+    
+    FILE * f = fopen(path.c_str(), "wb"); 
+    if(!f){
+        return false;
+    }
+
+    //Iterate and write array (after being reshaped to 1D row major)
+    auto doas = std::vector<int>();
+    auto vals = std::vector<float>();
+    for(auto i : v){
+        doas.emplace_back(i.idx);
+        vals.emplace_back(i.val);
+    }
+    for(int i = 0; i < doas.size(); i++){
+        int nb = fwrite( &doas[i], 4, 1, f); 
+        if(nb != 1){
+            fclose(f);
+            return false;
+        }
+    }
+    for(int i = 0; i < vals.size(); i++){
+        int nb = fwrite( &vals[i], 4, 1, f); 
+        if(nb != 1){
+            fclose(f);
+            return false;
+        }
+    }
+
+    
+    fclose(f); 
+    return true;
+
+}
+
 //Default constructor
 DOA::DOA(){
     fs = 400000; //400 KSPS 
@@ -69,9 +158,12 @@ std::vector<Peak> DOA::estimateDOA(float inputData[]){
     // Compute Covariance of transducer data
     Eigen::Matrix4cf R = (input_mat * input_mat.adjoint()) / numSnapshots; 
 
-#ifdef DEBUG
+#ifdef DEBUG_PRINT
     std::cout << "Covariance Matrix from Real Data\n"; 
     std::cout << R; 
+#endif
+#ifdef TEST
+        d_write_cf(R, "R_xx"); // Log covariance matrix to file
 #endif
         
     return estimateDOA_cov(R); 
@@ -89,15 +181,14 @@ std::vector<struct Peak> DOA::estimateDOA_cov(Eigen::Matrix4cf cov){
     Eigen::SelfAdjointEigenSolver<Eigen::Matrix4cf> eig(cov); 
 
     if(eig.info() != Eigen::Success){
-        //throw std::runtime_error("Eigen Value Decomposition Failed"); 
-        return {}; 
+        throw std::runtime_error("Eigen Value Decomposition Failed"); 
     }
     
 
     Eigen::VectorXf eigenvalues = eig.eigenvalues().real().cast<float>();
     Eigen::MatrixXcf eigenvectors = eig.eigenvectors();
 
-#ifdef DEBUG
+#ifdef DEBUG_PRINT
     std::cout << "Eigen Vectors Pre Sort\n"; 
     std::cout << eigenvectors<< "\n"; 
     std::cout << "Eigen Values Pre Sort \n"; 
@@ -123,8 +214,12 @@ std::vector<struct Peak> DOA::estimateDOA_cov(Eigen::Matrix4cf cov){
         eigenvalues_sorted(i) = eigen_pairs[i].first;
     }
 
-#ifdef DEBUG
-    std::cout << "Eigenvectors (sorted):\n" << eigenvectors_sorted << "\n";
+#ifdef DEBUG_PRINT
+      std::cout << "Eigenvectors (sorted):\n" << eigenvectors_sorted << "\n";
+#endif
+#ifdef TEST
+      d_write_cf(eigenvectors_sorted, "eigen_vects"); 
+      d_write_vf(eigenvalues_sorted, "eigen_vals"); //Log eigenvalues 
 #endif
 
     // Extract noise subspace: LAST (M-Nsig) columns after descending sort
@@ -132,9 +227,12 @@ std::vector<struct Peak> DOA::estimateDOA_cov(Eigen::Matrix4cf cov){
     int num_noise = M - N_signals;
     Eigen::MatrixXcf noise_subspace = eigenvectors_sorted.rightCols(num_noise);
 
-#ifdef DEBUG
+#ifdef DEBUG_PRINT
     std::cout << "Noise Subspace\n"; 
     std::cout << noise_subspace << "\n"; 
+#endif
+#ifdef TEST
+        d_write_cf(noise_subspace, "noise_eigenvects"); //Log noise subspace
 #endif
     
     auto DOA_angles = std::vector<double>(N_signals); //Create vector to hold DOA_angles
@@ -144,7 +242,7 @@ std::vector<struct Peak> DOA::estimateDOA_cov(Eigen::Matrix4cf cov){
     for(int i = 0; i < 1; i++){
         std::vector<struct Peak> res; 
         genPseudoSpectrum(noise_subspace, fc[i], res);  
-#ifdef DEBUG
+#ifdef DEBUG_PRINT
         //Search for peaks 
         // Print top N peaks
         std::cout << "\n=== TOP " << N_signals << " PEAKS ===\n";
@@ -161,32 +259,35 @@ std::vector<struct Peak> DOA::estimateDOA_cov(Eigen::Matrix4cf cov){
 
 //Take in noise subspace, calculate MUSIC pseudo spectrum
 void DOA::genPseudoSpectrum(Eigen::MatrixXcf & noiseSub, double fc, std::vector<struct Peak> & result){
-#ifdef DEBUG
+#ifdef DEBUG_PRINT
     std::cout << "Steering Vectors \n"; 
     std::cout  << sv; 
-    result = std::vector<struct Peak>();  
 #endif
-    
+#ifdef TEST
+    //Write sv matrix to file 
+    d_write_cf(sv, "sv");
+#endif
+    result = std::vector<struct Peak>();  
     // sv' * noise_eigenvects
     // Results in angles x noise eigenvectors matrix
     Eigen::MatrixXcf projection = sv.adjoint() * noiseSub;
 
-#ifdef DEBUG
+#ifdef DEBUG_PRINT
     std::cout << "\nProjection (sv' * noise_eigenvects) : \n" << projection; 
 #endif
-
     // abs(...)^2
     // Element wise square each element
     Eigen::MatrixXf projection_abs_squared = projection.cwiseAbs2();  
 
-#ifdef DEBUG
+#ifdef DEBUG_PRINT
     std::cout << "\nProjection abs squared  : \n" << projection_abs_squared; 
 #endif
-    
+
     // sum(..., 2) - sum across columns 
     // rowwise().sum() results in Mx1 vector where each element is sum along the row
     Eigen::VectorXf D = projection_abs_squared.rowwise().sum(); 
-#ifdef DEBUG
+
+#ifdef DEBUG_PRINT
     std::cout << "\nD  : \n" << D; 
 #endif
     //Add small number to prevent division by zero
@@ -197,8 +298,11 @@ void DOA::genPseudoSpectrum(Eigen::MatrixXcf & noiseSub, double fc, std::vector<
     // 1.0f / D.array() computes element wise division
     // .sqrt() element wise sqrt()
     Eigen::VectorXf spec = (1.0f / D.array()).sqrt(); 
-#ifdef DEBUG
+#ifdef DEBUG_PRINT
     std::cout << "\n Spectrum  : \n" << spec; 
+#endif
+#ifdef TEST
+    d_write_vf(spec, "spec");
 #endif
     std::vector<int> peak_indicies = findPeaks(spec, N_signals);  
 
@@ -225,15 +329,17 @@ std::vector<int> DOA::findPeaks(const Eigen::VectorXf& signal, int max_peaks) {
         }
     }
     
-    // Check boundaries (first and last elements can also be peaks)
-    if (N > 1) {
-        if (signal(0) > signal(1)) {
-            peaks.push_back(std::make_pair(signal(0), 0));
-        }
-        if (signal(N-1) > signal(N-2)) {
-            peaks.push_back(std::make_pair(signal(N-1), N-1));
-        }
-    }
+    // Matlab script ignores peaks at the start and end, checking these values
+    // can lead to incorrect results
+    //// Check boundaries (first and last elements can also be peaks)
+    //if (N > 1) {
+    //    if (signal(0) > signal(1)) {
+    //        peaks.push_back(std::make_pair(signal(0), 0));
+    //    }
+    //    if (signal(N-1) > signal(N-2)) {
+    //        peaks.push_back(std::make_pair(signal(N-1), N-1));
+    //    }
+    //}
     
     // Sort peaks by height in descending order
     std::sort(peaks.begin(), peaks.end(),
@@ -245,7 +351,7 @@ std::vector<int> DOA::findPeaks(const Eigen::VectorXf& signal, int max_peaks) {
     for (int i = 0; i < num_peaks; i++) {
         peak_indices.push_back(peaks[i].second);
     }
-#ifdef DEBUG 
+#ifdef DEBUG_PRINT
     std::cout << "\n=== PEAK FINDING ===\n";
     std::cout << "Total peaks found: " << peaks.size() << "\n";
     std::cout << "Top peaks (index, angle, value):\n";
@@ -345,10 +451,6 @@ Eigen::MatrixXcf DOA::steeringVectorULA(double elementSpacing,
     const std::complex<float> j(0.0f, 1.0f);
     const float two_pi = 2.0f * M_PI;
     
-    // For broadside (ULA), steering vector is:
-    // sv = exp(-1j * 2*pi * elementPos * sin(angle))
-    // where elementPos[n] = n * elementSpacing
-    
     for (int m = 0; m < M; m++) {
         float sin_angle = std::sin(static_cast<float>(scanAngles(m) * DEG2RAD));
         
@@ -359,17 +461,6 @@ Eigen::MatrixXcf DOA::steeringVectorULA(double elementSpacing,
         }
     }
     
-    //Store steering vector into a file for verification purposes 
-#ifdef DEBUG
-
-    FILE * f = fopen("./cvars/steeringvec.dat", "w");
-    for(int m = 0; m < M; m++){
-        for(int n = 0; n < N_elements; n++){
-
-
-        }
-    }
-#endif
     return sv;
 }
 

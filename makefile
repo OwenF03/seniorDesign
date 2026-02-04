@@ -9,8 +9,12 @@ BUILD ?= release
 
 ifeq ($(BUILD),debug)
 	MUSIC_SRC = MUSIC.cpp
-	CFLAGS = $(BASE_CFLAGS) -O0 -DDEBUG
+	CFLAGS = $(BASE_CFLAGS) -O0 -DDEBUG_PRINT -DTEST
 	OUTPUT = music_debug.out
+else ifeq ($(BUILD),test)
+	MUSIC_SRC = MUSIC.cpp
+	CFLAGS = $(BASE_CFLAGS) -O0 -DTEST
+	OUTPUT = music_test.out
 else
 	MUSIC_SRC = MUSIC.cpp
 	CFLAGS = $(BASE_CFLAGS) -O2
@@ -23,17 +27,12 @@ OBJS = $(SRCS:.cpp=.o)
 
 all: $(OUTPUT)
 
-debugSingle: 
-	$(MAKE) BUILD=debugS
-
-single: 
-	$(MAKE) BUILD=releaseS
-
 music: 
 	$(MAKE) BUILD=music
-
 debug:
 	$(MAKE) BUILD=debug
+test: 
+	$(MAKE) BUILD=test
 
 $(OUTPUT): $(OBJS)
 	$(CXX) $(OBJS) -o $(OUTPUT) $(MATFLAGS) $(LDFLAGS)
