@@ -1,12 +1,25 @@
 // Code is based on Matlab musicdoa.m, steeringvec.m
 #include "MUSIC.h"
+#include <cstdint>
 
 //Default constructor
 DOA::DOA(){
     fs = 400000; //400 KSPS
-    positions = {0, d, 2 * d, 3 * d}; //In meters, will be much smaller
+    for(int i = 0; i < M; i++){
+        positions[i] = i * d;
+    }
     scanAngles = Eigen::VectorXd::LinSpaced(181, -90, 90);
     sv = steeringVectorULA(elSpacing, M, scanAngles);
+    fc[0] = 30000;
+}
+
+DOA::DOA(int fs, float * fc) : fs(fs) {
+    for(int i = 0; i < M; i++){
+        positions[i] = i * d;
+    }
+    for(int i = 0; i < N_signals; i++){
+        this->fc[i] = *(fc + i);
+    }
 }
 
 //Constructor with arguments
@@ -15,10 +28,27 @@ DOA::DOA(int fs, std::array<double, M> positions) : fs(fs), positions(positions)
     sv = steeringVectorULA(elSpacing, M, scanAngles);
 }
 
+// Allow parameters in params.h to be overwritten
+DOA::DOA(int fs, double spacing, float * f_c) : fs(fs) {
+    //positions = {0, dist, 2 * dist, 3 * dist}; //In meters, will be much smaller
+    for(int i = 0; i < M; i++){
+        positions[i] = i * d;
+    }
+    scanAngles = Eigen::VectorXd::LinSpaced(181, -90, 90);
+    for(int i = 0; i < N_signals; i++){
+        fc[i] = *(f_c + i);
+    }
+    sv = steeringVectorULA_delay(spacing, M, scanAngles, fc[0]);
+
+}
+
 DOA::DOA(int fs) : fs(fs){
-    positions = {0, d, 2 * d, 3 * d}; //In meters, will be much smaller
+    for(int i = 0; i < M; i++){
+        positions[i] = i * d;
+    }                                 //
     scanAngles = Eigen::VectorXd::LinSpaced(181, -90, 90);
     sv = steeringVectorULA(elSpacing, M, scanAngles);
+    fc[0] = 30000;
 }
 
 // Make real valued signal analytical so it will work with MUSIC algo
@@ -67,12 +97,8 @@ std::vector<Peak> DOA::estimateDOA(float inputData[]){
     }
 
     // Compute Covariance of transducer data
-    Eigen::Matrix4cf R = (input_mat * input_mat.adjoint()) / numSnapshots;
+    Eigen::MatrixXcf R = (input_mat * input_mat.adjoint()) / numSnapshots;
 
-#ifdef DEBUG
-    std::cout << "Covariance Matrix from Real Data\n";
-    std::cout << R;
-#endif
 
     return estimateDOA_cov(R);
 
@@ -80,30 +106,23 @@ std::vector<Peak> DOA::estimateDOA(float inputData[]){
 
 //Estimate DOA for incoming siganls
 // input is the covariance matrix of the adc data
-std::vector<struct Peak> DOA::estimateDOA_cov(Eigen::Matrix4cf cov){
+std::vector<struct Peak> DOA::estimateDOA_cov(Eigen::MatrixXcf cov){
 
     //Ensure Hermitian symetry
     cov = (cov + cov.adjoint()) / 2.0f;
 
     //Perform eigen value decomposition on the covariance matrix R
-    Eigen::SelfAdjointEigenSolver<Eigen::Matrix4cf> eig(cov);
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcf> eig(cov);
 
     if(eig.info() != Eigen::Success){
         //throw std::runtime_error("Eigen Value Decomposition Failed");
-    	// Exeptions on embedded systems are not ideal
-    	return {};
+        return {};
     }
 
 
     Eigen::VectorXf eigenvalues = eig.eigenvalues().real().cast<float>();
     Eigen::MatrixXcf eigenvectors = eig.eigenvectors();
 
-#ifdef DEBUG
-    std::cout << "Eigen Vectors Pre Sort\n";
-    std::cout << eigenvectors<< "\n";
-    std::cout << "Eigen Values Pre Sort \n";
-    std::cout << eigenvalues << "\n";
-#endif
     // Sort eigenvalues in DESCENDING order (like MATLAB)
     std::vector<std::pair<float, int>> eigen_pairs;
     for (int i = 0; i < M; i++) {
@@ -124,36 +143,21 @@ std::vector<struct Peak> DOA::estimateDOA_cov(Eigen::Matrix4cf cov){
         eigenvalues_sorted(i) = eigen_pairs[i].first;
     }
 
-#ifdef DEBUG
-    std::cout << "Eigenvectors (sorted):\n" << eigenvectors_sorted << "\n";
-#endif
 
     // Extract noise subspace: LAST (M-Nsig) columns after descending sort
     // These correspond to the smallest eigenvalues
     int num_noise = M - N_signals;
     Eigen::MatrixXcf noise_subspace = eigenvectors_sorted.rightCols(num_noise);
 
-#ifdef DEBUG
-    std::cout << "Noise Subspace\n";
-    std::cout << noise_subspace << "\n";
-#endif
 
     auto DOA_angles = std::vector<double>(N_signals); //Create vector to hold DOA_angles
 
     //Perform peak search
     // NOTE : needs to be expanded so that input signal is filtered before each fc run
     for(int i = 0; i < 1; i++){
+        //std::cout << fc[i];
         std::vector<struct Peak> res;
         genPseudoSpectrum(noise_subspace, fc[i], res);
-#ifdef DEBUG
-        //Search for peaks
-        // Print top N peaks
-        std::cout << "\n=== TOP " << N_signals << " PEAKS ===\n";
-        for (int i = 0; i < std::min(N_signals, (int)res.size()); i++) {
-            std::cout << "Peak " << i+1 << ": Angle = " << (res[i].idx - 90)
-                      << " degrees, Value = " << res[i].val << "\n";
-        }
-#endif
         return res;
     }
 
@@ -162,34 +166,20 @@ std::vector<struct Peak> DOA::estimateDOA_cov(Eigen::Matrix4cf cov){
 
 //Take in noise subspace, calculate MUSIC pseudo spectrum
 void DOA::genPseudoSpectrum(Eigen::MatrixXcf & noiseSub, double fc, std::vector<struct Peak> & result){
-#ifdef DEBUG
-    std::cout << "Steering Vectors \n";
-    std::cout  << sv;
     result = std::vector<struct Peak>();
-#endif
-
     // sv' * noise_eigenvects
     // Results in angles x noise eigenvectors matrix
     Eigen::MatrixXcf projection = sv.adjoint() * noiseSub;
-
-#ifdef DEBUG
-    std::cout << "\nProjection (sv' * noise_eigenvects) : \n" << projection;
-#endif
 
     // abs(...)^2
     // Element wise square each element
     Eigen::MatrixXf projection_abs_squared = projection.cwiseAbs2();
 
-#ifdef DEBUG
-    std::cout << "\nProjection abs squared  : \n" << projection_abs_squared;
-#endif
 
     // sum(..., 2) - sum across columns
     // rowwise().sum() results in Mx1 vector where each element is sum along the row
     Eigen::VectorXf D = projection_abs_squared.rowwise().sum();
-#ifdef DEBUG
-    std::cout << "\nD  : \n" << D;
-#endif
+
     //Add small number to prevent division by zero
     D.array() += FLT_MIN;
 
@@ -198,9 +188,6 @@ void DOA::genPseudoSpectrum(Eigen::MatrixXcf & noiseSub, double fc, std::vector<
     // 1.0f / D.array() computes element wise division
     // .sqrt() element wise sqrt()
     Eigen::VectorXf spec = (1.0f / D.array()).sqrt();
-#ifdef DEBUG
-    std::cout << "\n Spectrum  : \n" << spec;
-#endif
     std::vector<int> peak_indicies = findPeaks(spec, N_signals);
 
     for(int i : peak_indicies){
@@ -226,15 +213,17 @@ std::vector<int> DOA::findPeaks(const Eigen::VectorXf& signal, int max_peaks) {
         }
     }
 
-    // Check boundaries (first and last elements can also be peaks)
-    if (N > 1) {
-        if (signal(0) > signal(1)) {
-            peaks.push_back(std::make_pair(signal(0), 0));
-        }
-        if (signal(N-1) > signal(N-2)) {
-            peaks.push_back(std::make_pair(signal(N-1), N-1));
-        }
-    }
+    // Matlab script ignores peaks at the start and end, checking these values
+    // can lead to incorrect results
+    //// Check boundaries (first and last elements can also be peaks)
+    //if (N > 1) {
+    //    if (signal(0) > signal(1)) {
+    //        peaks.push_back(std::make_pair(signal(0), 0));
+    //    }
+    //    if (signal(N-1) > signal(N-2)) {
+    //        peaks.push_back(std::make_pair(signal(N-1), N-1));
+    //    }
+    //}
 
     // Sort peaks by height in descending order
     std::sort(peaks.begin(), peaks.end(),
@@ -246,17 +235,6 @@ std::vector<int> DOA::findPeaks(const Eigen::VectorXf& signal, int max_peaks) {
     for (int i = 0; i < num_peaks; i++) {
         peak_indices.push_back(peaks[i].second);
     }
-#ifdef DEBUG
-    std::cout << "\n=== PEAK FINDING ===\n";
-    std::cout << "Total peaks found: " << peaks.size() << "\n";
-    std::cout << "Top peaks (index, angle, value):\n";
-    for (int i = 0; i < std::min(5, (int)peaks.size()); i++) {
-        int idx = peaks[i].second;
-        float val = peaks[i].first;
-        std::cout << "  Peak " << (i+1) << ": idx=" << idx
-                  << ", angle=" << (idx - 90) << "°, value=" << val << "\n";
-    }
-#endif
     return peak_indices;
 }
 
@@ -346,10 +324,6 @@ Eigen::MatrixXcf DOA::steeringVectorULA(double elementSpacing,
     const std::complex<float> j(0.0f, 1.0f);
     const float two_pi = 2.0f * M_PI;
 
-    // For broadside (ULA), steering vector is:
-    // sv = exp(-1j * 2*pi * elementPos * sin(angle))
-    // where elementPos[n] = n * elementSpacing
-
     for (int m = 0; m < M; m++) {
         float sin_angle = std::sin(static_cast<float>(scanAngles(m) * DEG2RAD));
 
@@ -360,17 +334,44 @@ Eigen::MatrixXcf DOA::steeringVectorULA(double elementSpacing,
         }
     }
 
-    //Store steering vector into a file for verification purposes
-#ifdef DEBUG
+    return sv;
+}
 
-    FILE * f = fopen("./cvars/steeringvec.dat", "w");
-    for(int m = 0; m < M; m++){
-        for(int n = 0; n < N_elements; n++){
+// Incorporates ADC time delay into phase delay
+// elementSpacing: element spacing in wavelengths (typically 0.5)
+// N_elements: number of array elements
+// scanAngles: 1xM vector of broadside angles (in degrees)
+// freq_hz   : Frequency of signal source
+Eigen::MatrixXcf DOA::steeringVectorULA_delay(double elementSpacing,
+                                    int N_elements,
+                                    const Eigen::VectorXd& scanAngles,
+                                    int freq_hz) {
+    const double DEG2RAD = M_PI / 180.0;
+    int M = scanAngles.size();  // number of angles
 
+    Eigen::MatrixXcf sv(N_elements, M);
 
+    const std::complex<float> j(0.0f, 1.0f);
+    const float two_pi = 2.0f * M_PI;
+
+    // ADC constraints
+    const float adc_clk_freq = 25000000.0f; // 25 MHz
+    const float cycles_per_conv = 15.0f;
+    const float dt_per_sensor = (1.0f / adc_clk_freq) * cycles_per_conv;
+
+    for (int m = 0; m < M; m++) {
+        float sin_angle = std::sin(static_cast<float>(scanAngles(m) * DEG2RAD));
+
+        for (int n = 0; n < N_elements; n++) {
+            float elementPos = n * elementSpacing;
+            float phase = two_pi * elementPos * sin_angle;
+            // ADC Phase delay
+            float phase_adc = two_pi * static_cast<float>(scanAngles(m) * DEG2RAD)
+                              * dt_per_sensor * n;
+            phase = phase + phase_adc;
+            sv(n, m) = std::exp(j * phase);
         }
     }
-#endif
     return sv;
 }
 

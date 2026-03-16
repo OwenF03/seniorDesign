@@ -9,6 +9,7 @@ import numpy as np
 class Test: 
     SIZEFLOAT = 4 # size of float in bytes
     NUMSENSORS = 4
+    CMDLEN = 8
     m_conn = serial.Serial() 
     m_voltage = np.zeros((NUMSENSORS, 0))
     def __init__(self, port, baud = 921600, NUMSENSORS = 4):
@@ -16,7 +17,7 @@ class Test:
         self.m_conn.port = port
         self.m_conn.baudrate = baud 
         self.m_conn.open()
-        self.m_conn.timeout = 10
+        self.m_conn.timeout = 2
 
     #Send a start command (binary 1, tbd if final value) 
     def start_transfer(self):
@@ -37,9 +38,9 @@ class Test:
             sh.reset_input_buffer()
             readVals = sh.read(readSize)  
         print(len(readVals))
-        if(len(readVals) % 4 != 0):
+        if(len(readVals) % self.NUMSENSORS != 0):
             print(readVals)
-            num = (len(readVals) // 4) - 1
+            num = (len(readVals) // self.NUMSENSORS) - 1
             print(len(readVals))
 
         #iterate through byte array by four 
@@ -47,10 +48,22 @@ class Test:
             ret[i // 4] = struct.unpack('f', readVals[i : i + 4])[0] #Construct float from read values (bytearray)
         
         self.m_voltage.resize((self.NUMSENSORS, num))
+        rv = np.zeros((self.NUMSENSORS, num)) # return value
         # reorder array so that the sensor voltages are in order 0, 1, 2 ...
         for i in range(0, self.NUMSENSORS):
             for j in range(i, ret.size, self.NUMSENSORS):
-                self.m_voltage[i][j // 4] = ret[j]
+                self.m_voltage[i][j // self.NUMSENSORS] = ret[j]
+                rv[i][j // self.NUMSENSORS] = ret[j]
+        return rv
+
+    # Populate a numpy array containing num items recieved
+    # from open serial port
+    def recieve_ack(self, n=CMDLEN): 
+        readVals = []
+        with self.m_conn as sh:
+            readVals.append(sh.read(n))
+        return readVals; 
+
 
 
     def print_voltages(self):
@@ -78,13 +91,14 @@ class Test:
         ax.set_ylabel("Voltage (V)")
         return ax
 
-    def plotSignleSensor(self, sensorNum, numSamples = None):
+    def plotSingleSensor(self, sensorNum, numSamples = None):
         ax = self.m_plotSingleSensor(sensorNum, numSamples)
         fig = ax.figure
-        fig.show()
+        plt.show(fig)
 
     #Send string as UART
     def send_msg(self, msg):
+        self.m_conn.reset_output_buffer;  
         transmit = bytearray() 
         for i in msg:
             transmit.append(int(i)) 
@@ -97,6 +111,7 @@ class Test:
         if(numSamples is None):
             numSamples = self.m_voltage[0].size
 
+        print("PLOT ALL NUM SENSORS " + str(self.NUMSENSORS))
         cols = int(np.ceil(np.sqrt(self.NUMSENSORS)))
         rows = int(np.ceil(self.NUMSENSORS / cols))
 

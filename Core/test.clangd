@@ -1,0 +1,7 @@
+CompileFlags:
+Add: [
+    - -I/usr/arm-linux-gnueabihf/include/
+    - -I/home/owen/STM32CubeIDE/practice/ADC_nucleo2/Inc/
+	- -D__INT32_TYPE__=long
+	- -D__UINT32_TYPE__=unsigned long
+]

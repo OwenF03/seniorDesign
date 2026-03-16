@@ -11,15 +11,18 @@
 #include <float.h>
 #include "params.h"
 
+
 //For sorting results
 struct Peak{
-    float val; //  Value being sorted
     int idx;   // Index in spectrum list (DOA)
+    float val; //  Value being sorted
 };
 
 //Class designed to implement the MUSIC direction finding algorithm
 class DOA{
     private:
+
+        float fc[N_signals];
         int fs; // Sampling frequency
         std::array<double, M> positions; // Transducer positions in meters
         Eigen::MatrixXcf sv; // Steering vector
@@ -30,6 +33,8 @@ class DOA{
         //Constructors
         DOA();
         DOA(int fs, std::array<double, M> positions);
+        DOA(int fs, double d, float * fc);
+        DOA(int fs, float *);
         DOA(int fs);
 
         // Make real valued signal analytical so it will work with MUSIC algo
@@ -42,7 +47,7 @@ class DOA{
         //Estimate DOA for incoming siganls
         // input is the covariance matrix of the adc data
         // For debug purposes
-        std::vector<struct Peak> estimateDOA_cov(Eigen::Matrix4cf cov);
+        std::vector<struct Peak> estimateDOA_cov(Eigen::MatrixXcf cov);
 
         //Take in noise subspace, calculate MUSIC pseudo spectrum
         void genPseudoSpectrum(Eigen::MatrixXcf & noiseSub, double fc, std::vector<struct Peak> & result);
@@ -74,6 +79,8 @@ class DOA{
         // scanAngles: 1xM vector of broadside angles (in degrees)
         // Generated with calude
         Eigen::MatrixXcf steeringVectorULA(double elementSpacing,int N_elements,const Eigen::VectorXd& scanAngles);
+
+        Eigen::MatrixXcf steeringVectorULA_delay(double elementSpacing,int N_elements,const Eigen::VectorXd& scanAngles, int freq_hz);
 
         // For use with actual physical parameters
         // generated with Calude
